@@ -2,7 +2,7 @@
 import numpy as np
 from tqdm import tqdm
 
-from src.bstrapping.interfaces.bootstrap import Bootstrap
+from bstrapping.interfaces.bootstrap import Bootstrap
 
 sampled_points_of_distributions_bootstrapped = []
 means_bootstrapped = []
@@ -13,10 +13,33 @@ class DiscreteBootstrap(Bootstrap):
     Perform the discrete bootstrap
 
     The discrete bootstrap generates new samples from a given sample set
-    with n elements by drawing n times from the sample set with replacements.
+    with n elements by drawing n times from the sample set with replacement.
     This bootstrap procedure is only valid if the samples are iid.
 
     See https://en.wikipedia.org/wiki/Bootstrapping_(statistics) in section Case resampling for further details.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from bstrapping.discrete_bootstrap import DiscreteBootstrap
+
+    >>> # specify variance, mean and number of the samples
+    >>> variance = 10
+    >>> mean = 4
+    >>> number_sample_points = 100
+
+    >>> # generate samples from a normal distribution
+    >>> samples = np.random.multivariate_normal(
+    >>>     mean=mean * np.ones(number_sample_points),
+    >>>     cov=variance * np.identity(number_sample_points))
+
+    >>> # Perform the discrete bootstrap
+    >>> bootstrap = DiscreteBootstrap(samples=samples)
+
+    >>> # Print bootstrapped variance of the empirical mean along with the true variance
+    >>> print(f'Bootstrapped variance: \n {bootstrap.bootstrapped_variance}')
+
+    >>> print(f'True variance of empirical mean: {variance / number_sample_points}')
     """
 
     def __init__(self,

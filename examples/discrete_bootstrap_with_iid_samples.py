@@ -4,19 +4,22 @@
 """
 
 import numpy as np
-from src.bstrapping.discrete_bootstrap import DiscreteBootstrap
+from bstrapping.discrete_bootstrap import DiscreteBootstrap
 
-
-number_sample_points = 20 ** 2
-
-# iid normal
+# specify variance, mean and number of the samples
 variance = 10
 mean = 4
+number_sample_points = 100
 
+# generate samples from a normal distribution
 samples = np.random.multivariate_normal(
     mean=mean * np.ones(number_sample_points),
     cov=variance * np.identity(number_sample_points))
 
-print(f'True variance of empirical mean: {variance / number_sample_points}')
+# Perform the discrete bootstrap
+bootstrap = DiscreteBootstrap(samples=samples)
 
-bootstrap = DiscreteBootstrap(samples, number_bootstrap_samples=1000)
+# Print bootstrapped variance of the empirical mean along with the true variance
+print(f'Bootstrapped variance: \n {bootstrap.bootstrapped_variance}')
+
+print(f'True variance of empirical mean: {variance / number_sample_points}')

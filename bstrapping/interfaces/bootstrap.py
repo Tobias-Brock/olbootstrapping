@@ -70,12 +70,12 @@ class Bootstrap:
 
     @property
     def bootstrapped_means(self) -> np.ndarray:
-        """Calculate the mean of the bootstrapped samples in each dimension
+        """Calculate the mean of the bootstrapped samples for each sample and dimension
 
         Returns
         -------
         np.ndarray
-            average of bootstrapped samples
+            means of bootstrapped samples
         """
         return np.average(self.plain_bootstrapped_samples, axis=1)
 

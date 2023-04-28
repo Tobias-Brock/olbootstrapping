@@ -1,8 +1,8 @@
 import numpy as np
 from tqdm import tqdm
 
-from src.bstrapping.interfaces.bootstrap import Bootstrap
-from src.bstrapping.interfaces.weights import Weights
+from bstrapping.interfaces.bootstrap import Bootstrap
+from bstrapping.interfaces.weights import Weights
 
 
 class WeightedBootstrap(Bootstrap):
