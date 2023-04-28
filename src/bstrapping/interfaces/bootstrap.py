@@ -5,30 +5,23 @@ import numpy as np
 
 
 class Bootstrap:
-    def __init__(self,
-                 samples: np.ndarray,
-                 ):
-        if len(np.shape(samples)) > 2:
-            raise ValueError('Sample array must have maximal 2 dimensions')
 
-        self._plain_bootstrapped_samples = None
-        self._samples = samples
-
-        print(f'{self.number_samples} samples with dimension '
-              f'{self.dimension_samples} were obtained. \n')
-
+    @property
     @abstractmethod
-    def generate_bootstrap_samples(self, *args) -> None:
-        pass
+    def samples(self) -> np.ndarray:
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def plain_bootstrapped_samples(self) -> np.ndarray:
+        # 3 dim array: first: number bootstrapped samples,
+        # second sample in bootstrapped samples, third dimension of samples
+        raise NotImplementedError
 
     @property
     def bootstrapped_samples(self) -> Dict[str, np.ndarray]:
         return {f'{counter}/{self.number_samples} sample': value for counter, value in
-                enumerate(self._plain_bootstrapped_samples)}
-
-    @property
-    def samples(self) -> np.ndarray:
-        return self._samples
+                enumerate(self.plain_bootstrapped_samples)}
 
     @property
     def number_samples(self) -> int:
@@ -39,11 +32,9 @@ class Bootstrap:
         return np.shape(self.samples)[1]
 
     @property
-    def plain_bootstrapped_samples(self) -> np.ndarray:
-        return self._plain_bootstrapped_samples
+    def bootstrapped_means(self) -> np.ndarray:
+        return np.average(self.plain_bootstrapped_samples, axis=1)
 
     @property
-    def bootstrapped_means(self) -> float:
-        return np.average(self._plain_bootstrapped_samples, axis=1)
-
-# mean_bootstrapped = np.average(sampled_points[0])
+    def bootstrapped_variance(self) -> np.ndarray:
+        return np.var(self.bootstrapped_means)

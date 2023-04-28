@@ -1,17 +1,15 @@
-# bootstrapped samples
 import numpy as np
 from tqdm import tqdm
 
 from src.bstrapping.interfaces.bootstrap import Bootstrap
-
-sampled_points_of_distributions_bootstrapped = []
-means_bootstrapped = []
+from src.bstrapping.interfaces.weights import Weights
 
 
-class DiscreteBootstrap(Bootstrap):
+class WeightedBootstrap(Bootstrap):
     def __init__(self,
                  samples: np.ndarray,
-                 number_bootstrap_samples: int = 100
+                 weights: Weights,
+                 number_bootstrap_samples: int = 100,
                  ):
         if len(np.shape(samples)) > 2:
             raise ValueError('Sample array must have maximal 2 dimensions')
@@ -27,8 +25,10 @@ class DiscreteBootstrap(Bootstrap):
         print('Bootstrapping...')
         resampled_points = []
         for _ in tqdm(range(number_bootstrap_samples)):
-            resampled_points.append([self.samples[np.random.choice(self.number_samples)] for _, _ in
-                                     enumerate(self.samples)])
+            weight = weights()
+            # TODO: Check
+            resampled_points.append(np.average(weight) * weight * self.samples for _, _ in
+                                    enumerate(self.samples))
 
         self._plain_bootstrapped_samples = np.array(resampled_points)
 
