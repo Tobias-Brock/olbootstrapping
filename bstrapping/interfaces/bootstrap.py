@@ -7,6 +7,7 @@ import numpy as np
 class Bootstrap:
     """Generic interface for bootstrapping
     """
+
     @property
     @abstractmethod
     def samples(self) -> np.ndarray:
@@ -40,8 +41,7 @@ class Bootstrap:
         Returns
         -------
         Dict[str, np.ndarray]
-            keys indicate the number of the respective bootstrap sample
-            whereas the value is the respective bootstrap sample
+            keys indicate the number of the respective bootstrap sample whereas the value is the respective bootstrap sample
         """
         return {f'{counter}/{self.number_samples} sample': value for counter, value in
                 enumerate(self.plain_bootstrapped_samples)}

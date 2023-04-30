@@ -4,7 +4,7 @@
 """
 
 import numpy as np
-from bstrapping.discrete_bootstrap import DiscreteBootstrap
+from bstrapping.bootstrap_procedures.discrete_bootstrap import DiscreteBootstrap
 
 # specify variance, mean and number of the samples
 variance = 10

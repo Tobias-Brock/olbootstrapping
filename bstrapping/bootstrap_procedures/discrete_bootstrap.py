@@ -21,24 +21,19 @@ class DiscreteBootstrap(Bootstrap):
     Examples
     --------
     >>> import numpy as np
-    >>> from bstrapping.discrete_bootstrap import DiscreteBootstrap
-
+    >>> from bstrapping.bootstrap_procedures.discrete_bootstrap import DiscreteBootstrap
     >>> # specify variance, mean and number of the samples
     >>> variance = 10
     >>> mean = 4
     >>> number_sample_points = 100
-
     >>> # generate samples from a normal distribution
     >>> samples = np.random.multivariate_normal(
     >>>     mean=mean * np.ones(number_sample_points),
     >>>     cov=variance * np.identity(number_sample_points))
-
     >>> # Perform the discrete bootstrap
     >>> bootstrap = DiscreteBootstrap(samples=samples)
-
     >>> # Print bootstrapped variance of the empirical mean along with the true variance
-    >>> print(f'Bootstrapped variance: \n {bootstrap.bootstrapped_variance}')
-
+    >>> print(f'Bootstrapped variance: {bootstrap.bootstrapped_variance}')
     >>> print(f'True variance of empirical mean: {variance / number_sample_points}')
     """
 
@@ -50,7 +45,7 @@ class DiscreteBootstrap(Bootstrap):
         Parameters
         ----------
         samples :
-        nd.array
+        np.ndarray
             samples stored in 2 dimensional array with first dimension corresponding to the number of samples
 
         number_bootstrap_samples :
@@ -95,7 +90,8 @@ class DiscreteBootstrap(Bootstrap):
         Returns
         -------
         np.ndarray
-            bootstrap samples stored in 3 dimensional array with first dimension
-            corresponding to the number of bootstrap samples and second to the number of samples
+            bootstrap samples stored in 3 dimensional array
+            with first dimension corresponding to the number of bootstrap samples and second to the number of samples
+
         """
         return self._plain_bootstrapped_samples
