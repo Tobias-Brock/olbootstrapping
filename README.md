@@ -6,3 +6,6 @@ all projects should have the following four major sections to help you focus you
 - **How-To Guides**: Guides that take the reader through the steps required to solve a common problem (problem-oriented recipes).
 - **References**: Explanations that clarify and illuminate a particular topic. Geared towards understanding.
 - **Explanations**: Technical descriptions of the machinery and how to operate it (key classes, functions, APIs, and so forth). Think Encyclopedia article.
+
+
+Table when to use which bootstrap

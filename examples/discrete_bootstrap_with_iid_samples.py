@@ -9,7 +9,7 @@ from bstrapping.bootstrap_procedures.discrete_bootstrap import DiscreteBootstrap
 # specify variance, mean and number of the samples
 variance = 10
 mean = 4
-number_sample_points = 100
+number_sample_points = 1000
 
 # generate samples from a normal distribution
 samples = np.random.multivariate_normal(
