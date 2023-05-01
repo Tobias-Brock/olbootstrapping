@@ -25,10 +25,8 @@ class WeightedBootstrap(Bootstrap):
         print('Bootstrapping...')
         resampled_points = []
         for _ in tqdm(range(number_bootstrap_samples)):
-            weight = weights()
-            # TODO: Check
-            resampled_points.append(np.average(weight) * weight * self.samples for _, _ in
-                                    enumerate(self.samples))
+            weight = weights().reshape(-1, 1)
+            resampled_points.append(1 / np.average(weight) * weight * self.samples)
 
         self._plain_bootstrapped_samples = np.array(resampled_points)
 
