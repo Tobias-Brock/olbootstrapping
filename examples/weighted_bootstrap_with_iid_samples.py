@@ -1,4 +1,5 @@
-"""Example script for applying the discrete bootstrap to independent and identically distributed samples
+"""Example script for applying the weighted bootstrap with Gaussian and recursive defined weights
+to independent and identically distributed samples
 
 
 """

@@ -9,8 +9,7 @@ means_bootstrapped = []
 
 
 class DiscreteBootstrap(Bootstrap):
-    """
-    Perform the discrete bootstrap
+    """Perform the discrete bootstrap
 
     The discrete bootstrap generates new samples from a given sample set
     with n elements by drawing n times from the sample set with replacement.

@@ -9,10 +9,17 @@ class WeightedBootstrap(Bootstrap):
     """Perform the weighted bootstrap
 
     The weighted bootstrap generates new samples from a given sample set
-    by multiplying each sample with a random weight. The weights can be specified in a sequence of the same length
-    as the samples.
+    by multiplying each sample with a random weight, i.e.
+
+    .. math::
+        \tilde{X_i}=V_iX_i
+
+    where X is the sample and V is the random weight.
     This bootstrap procedure may be used for iid samples but also for weakly dependent samples
-    by using respective weights. See the weight module for more information.
+    by using suitable weights.
+    The weights are specified in a sequence of the same length
+    as the samples.
+    See the weight module for more information.
 
     Examples
     --------

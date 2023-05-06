@@ -1,10 +1,11 @@
-"""Example script for applying the discrete bootstrap to 2-dependent samples
+"""Example script for applying the discrete and weighted bootstrap with recursive defined weights to 2-dependent samples
 
 
 """
 
 import numpy as np
 
+from bstrapping.bootstrap_procedures.discrete_bootstrap import DiscreteBootstrap
 from bstrapping.bootstrap_procedures.weighted_bootstrap import WeightedBootstrap
 from bstrapping.weights.recursive_defined_sequence import RecursiveDefinedWeights
 
@@ -22,6 +23,11 @@ samples = np.array(Y[:-1]) + a * np.array(Y[1:])
 # calculated variance
 true_variance = (1 + a) ** 2 / number_sample_points * variance
 print(f'True variance of empirical mean: {true_variance}')
+
+# Perform the discrete bootstrap
+bootstrap = DiscreteBootstrap(samples=samples, number_bootstrap_samples=1000)
+# Print bootstrapped variance of the empirical mean along with the true variance
+print(f'Bootstrapped variance: \n {bootstrap.bootstrapped_variance}')
 
 # Perform the weighted bootstrap
 weights = RecursiveDefinedWeights(samples=samples)
