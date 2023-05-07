@@ -6,14 +6,24 @@ from bstrapping.interfaces.weights import Weights
 class GaussianWeights(Weights):
     r"""Generates Gaussian weights
 
-    Generate number of samples many realizations of normally distributed iid random variables
-    with mean and variance equal to one, i.e.
+    .. epigraph::
+        **When to apply:**
+        These weights are only valid for iid data.
+
+    Generate number-of-samples many realizations of normally distributed iid random variables
+    with mean and variance equal to one.
+
+    **Formula**
 
     .. math ::
 
         V_i \sim \mathcal{N}(1,1)
 
-    These weights are only valid for iid data.
+    Methods
+    -------
+
+    __call__() :
+        Generate realizations of the sequence of weights
 
     """
 
@@ -31,7 +41,7 @@ class GaussianWeights(Weights):
         self._samples = samples
 
     def __call__(self, ) -> np.ndarray:
-        """
+        """Generate realizations of the sequence of weights
 
         Returns
         -------
