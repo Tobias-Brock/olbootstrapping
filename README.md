@@ -1,52 +1,119 @@
 # Bstrapping: Bootstrapping in Python
 
-Bstrapping offers various bootstrapping procedures implemented in Python as well as suggestions for when to use which and further references.
+Bstrapping provides several bootstrapping methods implemented in a generic Python interface
+and suggestions for when to use which.
 
+## A short summary of bootstrapping
 
-You will find [further information about the theory of bootstrapping and how to use it properly](#the-theory-of-bootstrapping).
+Bootstrapping methods are re-sampling schemes with (asymptotic) theoretical guarantees.
+Given some (random) samples according to some distribution, bootstrapping allows you to
+generate (computationally cheap) synthetic new samples.
+Those samples behave similar in the following sense:
+The distribution of the *arithmetic mean* of the synthetic samples is (asymptotically)
+the distribution of the *arithmetic mean* of the real samples.
+Accordingly, we can use the synthetic samples in order to approximate the distribution of the
+arithmetic mean of the real samples.
 
-Table when to use which bootstrap
+> **Caution**: bootstrapped samples do **not** approximate the distribution of the real samples, but the arithmetic mean!
+
+However, with some mathematical tricks, one can apply bootstrapping to a multitude of scenarios
+where we are interested in some other statistic than the arithmetic mean (see [Advanced Usage](#advanced-usage))
+
+For a more detailled summary of bootstrapping see [this paper](our-paper).
 
 ## Installation
 The official release is available at PyPi:
 
-    pip install bstrapping
+```
+pip install bstrapping
+```
 
 You can clone this repository by running the following command:
 
-    git clone https://github.com/nicolaipalm/bootstrap
-    cd bstrapping
-    pip install .
+```
+git clone https://github.com/nicolaipalm/bootstrap
+cd bstrapping
+pip install
+```
 
 ## Getting started
-Lessons that take the reader by the hand through a series of steps to complete a project (or meaningful exercise). Geared towards the user’s learning.
+
+Before initializing any bootstrap procedure, the samples need to be
+stored in a **2 dimensional numpy array** where the first dimension corresponds to
+the number of samples.
+Here, we generate 1000 (iid) samples from a normal distribution with mean 1 and variance 10.
+```python
+import numpy as np
+samples = np.random.multivariate_normal(
+     mean=np.ones(1),
+     cov=10*np.identity(1000)) # generate samples
+```
+
+Next, the bootstrap procedure can be executed.
+We notice/assume the data to be iid, hence, choose the discrete boostrap.
+Say we wish to generate 100 new data sets
+(i.e. 100 new data sets with 1000 data points).
+
+```python
+from bstrapping.bootstrap_procedures.discrete_bootstrap import DiscreteBootstrap
+bootstrap = DiscreteBootstrap(samples=samples,number_bootstrap_samples=100) # Perform discrete bootstrap
+```
+
+From the bootstrapped samples, we can for example calculate an estimate of the variance of the
+arithmetic mean of the samples.
+
+```python
+print(f'Bootstrapped variance: \n {bootstrap.bootstrapped_variance}')
+
+print(f'True variance of arithmetic mean: {variance / number_sample_points}')
+```
 
 
-## How-To Guides
-Guides that take the reader through the steps required to solve a common problem (problem-oriented recipes).
-Provide real example:
 
-some data
+## When to use which bootstrap?
+<table>
 
-what bootstrap procedure?
+<tr>
+<th> Name </th> <th> when-to-use </th> <th> Code </th> <th> Reference </th>
+</tr>
 
-## Advanced Usage
-provide how to apply not to arithemtic mean:
-1. compose with function
-2. apply operator (such as sgd etc.)
+<tr>
+<td>
+Discrete bootstrap
+</td>
+<td>
 
-Ex: bootstrap parameters for parameter uncertainty
+samples are [iid](https://en.wikipedia.org/wiki/Independent_and_identically_distributed_random_variables)
 
-## Explanations
-Technical descriptions of the machinery and how to operate it (key classes, functions, APIs, and so forth). Think Encyclopedia article.
+</td>
+<td>
 
+    bootstrap = DiscreteBootstrap(samples=samples)
 
+</td>
+<td>
 
+</td>
+</tr>
 
+<tr>
+<td>
+Recursively defined bootstrap
+</td>
+<td>
 
-## The theory of bootstrapping
-### What is bootstrapping?
+samples are weakly dependent
 
+</td>
+<td>
 
+    weights = RecursiveDefinedWeights(samples=samples)
+    bootstrap = WeightedBootstrap(samples=samples, weights=weights)
 
-## References
+</td>
+<td>
+
+</td>
+</tr>
+
+</table>
