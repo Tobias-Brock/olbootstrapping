@@ -9,7 +9,8 @@ from bstrapping.bootstrap_procedures.weighted_bootstrap import WeightedBootstrap
 
 # specify variance, mean and number of the samples
 from bstrapping.weights.gaussian_weights import GaussianWeights
-from bstrapping.weights.recursive_defined_sequence import RecursiveDefinedWeights
+from bstrapping.weights.auto_regressive_weights import AutoRegressiveWeights
+from bstrapping.weights.moving_average import MovingAverage
 
 variance = 10
 mean = 4
@@ -29,7 +30,14 @@ print(f'Bootstrapped variance: \n {bootstrap.bootstrapped_variance}')
 
 print(f'True variance of empirical mean: {variance / number_sample_points}')
 
-weights = RecursiveDefinedWeights(samples=samples)
+weights = AutoRegressiveWeights(samples=samples)
+bootstrap = WeightedBootstrap(samples=samples, weights=weights)
+# Print bootstrapped variance of the empirical mean along with the true variance
+print(f'Bootstrapped variance: \n {bootstrap.bootstrapped_variance}')
+
+print(f'True variance of empirical mean: {variance / number_sample_points}')
+
+weights = MovingAverage(samples=samples)
 bootstrap = WeightedBootstrap(samples=samples, weights=weights)
 # Print bootstrapped variance of the empirical mean along with the true variance
 print(f'Bootstrapped variance: \n {bootstrap.bootstrapped_variance}')

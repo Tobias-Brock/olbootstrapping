@@ -7,9 +7,11 @@ import numpy as np
 
 from bstrapping.bootstrap_procedures.discrete_bootstrap import DiscreteBootstrap
 from bstrapping.bootstrap_procedures.weighted_bootstrap import WeightedBootstrap
-from bstrapping.weights.recursive_defined_sequence import RecursiveDefinedWeights
+from bstrapping.weights.auto_regressive_weights import AutoRegressiveWeights
 
 # specify variance, mean and number of the samples
+from bstrapping.weights.moving_average import MovingAverage
+
 mean = 1
 variance = 2
 number_sample_points = 2500
@@ -30,7 +32,12 @@ bootstrap = DiscreteBootstrap(samples=samples, number_bootstrap_samples=1000)
 print(f'Bootstrapped variance: \n {bootstrap.bootstrapped_variance}')
 
 # Perform the weighted bootstrap
-weights = RecursiveDefinedWeights(samples=samples)
+weights = AutoRegressiveWeights(samples=samples)
 bootstrap = WeightedBootstrap(samples=samples, weights=weights, number_bootstrap_samples=1000)
+# Print bootstrapped variance of the empirical mean along with the true variance
+print(f'Bootstrapped variance: \n {bootstrap.bootstrapped_variance}')
+
+weights = MovingAverage(samples=samples)
+bootstrap = WeightedBootstrap(samples=samples, weights=weights)
 # Print bootstrapped variance of the empirical mean along with the true variance
 print(f'Bootstrapped variance: \n {bootstrap.bootstrapped_variance}')

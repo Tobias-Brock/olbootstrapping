@@ -14,12 +14,12 @@ the distribution of the *arithmetic mean* of the real samples.
 Accordingly, we can use the synthetic samples in order to approximate the distribution of the
 arithmetic mean of the real samples.
 
-> **Caution**: bootstrapped samples do **not** approximate the distribution of the real samples, but the arithmetic mean!
+> **Caution**: bootstrapped samples do **not** approximate the distribution of the samples, but their arithmetic mean!
 
 However, with some mathematical tricks, one can apply bootstrapping to a multitude of scenarios
-where we are interested in some other statistic than the arithmetic mean (see [Advanced Usage](#advanced-usage))
+where we are interested in some other statistic than the arithmetic mean (see [Advanced Usage]())
 
-For a more detailled summary of bootstrapping see [this paper](our-paper).
+For a more detailed summary of bootstrapping see [this paper](our-paper).
 
 ## Installation
 The official release is available at PyPi:
@@ -107,7 +107,7 @@ samples are weakly dependent
 </td>
 <td>
 
-    weights = RecursiveDefinedWeights(samples=samples)
+    weights = AutoRegressiveWeights(samples=samples)
     bootstrap = WeightedBootstrap(samples=samples, weights=weights)
 
 </td>

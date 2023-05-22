@@ -12,7 +12,7 @@ def generate_recursive_weight(i: int, V_i: float, alpha: float):
             1 / 2) * np.random.normal(loc=0, scale=1)
 
 
-class RecursiveDefinedWeights(Weights):
+class AutoRegressiveWeights(Weights):
     r"""Generate recursively defined weights
 
     .. epigraph::

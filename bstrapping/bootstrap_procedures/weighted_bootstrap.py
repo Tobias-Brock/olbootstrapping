@@ -32,7 +32,7 @@ class WeightedBootstrap(Bootstrap):
 
     >>> import numpy as np
     >>> from bstrapping.bootstrap_procedures.weighted_bootstrap import WeightedBootstrap
-    >>> from bstrapping.weights.recursive_defined_sequence import RecursiveDefinedWeights
+    >>> from bstrapping.weights.recursive_defined_sequence import AutoRegressiveWeights
     >>> mean, variance, number_sample_points = 1, 2, 2500 # specify variance, mean and number of the samples
     >>> a = 0.8
     >>> Y = [np.random.normal(loc=mean, scale=variance**(1/2)) for _ in range(number_sample_points+1)]
@@ -46,7 +46,7 @@ class WeightedBootstrap(Bootstrap):
 
     Initialize weights for the weighted bootstrap, here, we use the recursive defined weights for weakly dependent data
 
-    >>> weights = RecursiveDefinedWeights(samples=samples)
+    >>> weights = AutoRegressiveWeights(samples=samples)
 
     Perform the weighted bootstrap
 
