@@ -1,4 +1,6 @@
 # bootstrapped samples
+from typing import Optional
+
 import numpy as np
 from tqdm import tqdm
 
@@ -45,7 +47,7 @@ class DiscreteBootstrap(Bootstrap):
     """
 
     def __init__(self,
-                 samples: np.ndarray,
+                 samples: Optional[np.ndarray],
                  number_bootstrap_samples: int = 100
                  ):
         """
@@ -60,24 +62,25 @@ class DiscreteBootstrap(Bootstrap):
             number of bootstrap samples to be generated
 
         """
-        if len(np.shape(samples)) > 2:
-            raise ValueError('Sample array must have maximal 2 dimensions')
+        if samples is not None:
+            if len(np.shape(samples)) > 2:
+                raise ValueError('Sample array must have maximal 2 dimensions')
 
-        if len(np.shape(samples)) == 1:
-            samples = samples.reshape(-1, 1)
+            if len(np.shape(samples)) == 1:
+                samples = samples.reshape(-1, 1)
 
-        self._samples = samples
+            self._samples = samples
 
-        print(f'{self.number_samples} samples with dimension '
-              f'{self.dimension_samples} were obtained. \n')
+            print(f'{self.number_samples} samples with dimension '
+                  f'{self.dimension_samples} were obtained. \n')
 
-        print('Bootstrapping...')
-        resampled_points = []
-        for _ in tqdm(range(number_bootstrap_samples)):
-            resampled_points.append([self.samples[np.random.choice(self.number_samples)] for _, _ in
-                                     enumerate(self.samples)])
+            print('Bootstrapping...')
+            resampled_points = []
+            for _ in tqdm(range(number_bootstrap_samples)):
+                resampled_points.append([self.samples[np.random.choice(self.number_samples)] for _, _ in
+                                         enumerate(self.samples)])
 
-        self._plain_bootstrapped_samples = np.array(resampled_points)
+            self._plain_bootstrapped_samples = np.array(resampled_points)
 
     @property
     def samples(self) -> np.ndarray:

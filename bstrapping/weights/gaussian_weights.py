@@ -51,4 +51,4 @@ class GaussianWeights(Weights):
 
         """
 
-        return np.array([np.random.normal(loc=1, scale=1) for _, _ in enumerate(self._samples)])
+        return np.random.normal(loc=1, scale=1, size=len(self._samples))

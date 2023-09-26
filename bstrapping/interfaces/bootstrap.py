@@ -1,5 +1,6 @@
+import json
 from abc import abstractmethod
-from typing import Dict
+from typing import Dict, Optional
 
 import numpy as np
 
@@ -7,6 +8,31 @@ import numpy as np
 class Bootstrap:
     """Generic interface for bootstrapping
     """
+
+    def save_to_csv(self, file_name: str):
+        """Save data to csv file
+
+        Parameters
+        ----------
+        file_path : str
+            path to csv file
+        """
+        with open(f'{file_name}.json', 'w') as f:
+            json.dump({'samples': self.samples.tolist(),
+                       'plain_bootstrapped_samples': self.plain_bootstrapped_samples.tolist()}, f)
+
+    def load_from_csv(self, file_path: str):
+        """Load data from csv file
+
+        Parameters
+        ----------
+        file_path : str
+            path to csv file
+        """
+        with open(file_path) as f:
+            data = json.load(f)
+            self._samples = np.array(data['samples'])
+            self._plain_bootstrapped_samples = np.array(data['plain_bootstrapped_samples'])
 
     @property
     @abstractmethod
@@ -36,7 +62,7 @@ class Bootstrap:
 
     @property
     def bootstrapped_samples(self) -> Dict[str, np.ndarray]:
-        """Human readable form of the bootstrap samples
+        """Structured form of the bootstrap samples
 
         Returns
         -------
@@ -89,3 +115,24 @@ class Bootstrap:
             variance of the average of the bootstrapped samples
         """
         return np.var(self.bootstrapped_means)
+
+    def bootstrapped_quantile(self, q: float) -> float:
+        """Calculate the standardized quantile of the bootstrapped samples
+        """
+        standardized_samples = (self.bootstrapped_means - np.mean(self.samples)) / np.sqrt(self.bootstrapped_variance)
+        return np.quantile(a=standardized_samples, q=q)
+
+    def bootstrapped_confidence_interval(self,
+                                         alpha: float = 0.05,
+                                         beta: Optional[float] = None) -> np.ndarray:
+        """Return bootstrapped confidence intervals
+        """
+        if beta is None:
+            beta = 1/2*alpha
+            alpha = 1/2*alpha
+
+        lower_quantile = self.bootstrapped_quantile(q=1-beta)
+        upper_quantile = self.bootstrapped_quantile(q=alpha)
+
+        return np.mean(self.samples) - np.array([lower_quantile * np.sqrt(self.bootstrapped_variance),
+                                                 upper_quantile * np.sqrt(self.bootstrapped_variance)])

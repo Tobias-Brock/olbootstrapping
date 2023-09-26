@@ -1,3 +1,5 @@
+from typing import Optional
+
 import numpy as np
 from tqdm import tqdm
 
@@ -32,7 +34,7 @@ class WeightedBootstrap(Bootstrap):
 
     >>> import numpy as np
     >>> from bstrapping.bootstrap_procedures.weighted_bootstrap import WeightedBootstrap
-    >>> from bstrapping.weights.recursive_defined_sequence import AutoRegressiveWeights
+    >>> from bstrapping.weights.auto_regressive_weights import AutoRegressiveWeights
     >>> mean, variance, number_sample_points = 1, 2, 2500 # specify variance, mean and number of the samples
     >>> a = 0.8
     >>> Y = [np.random.normal(loc=mean, scale=variance**(1/2)) for _ in range(number_sample_points+1)]
@@ -60,7 +62,7 @@ class WeightedBootstrap(Bootstrap):
     """
 
     def __init__(self,
-                 samples: np.ndarray,
+                 samples: Optional[np.ndarray],
                  weights: Weights,
                  number_bootstrap_samples: int = 100,
                  ):
@@ -80,24 +82,25 @@ class WeightedBootstrap(Bootstrap):
             number of bootstrap samples to be generated
 
         """
-        if len(np.shape(samples)) > 2:
-            raise ValueError('Sample array must have maximal 2 dimensions')
+        if samples is not None:
+            if len(np.shape(samples)) > 2:
+                raise ValueError('Sample array must have maximal 2 dimensions')
 
-        if len(np.shape(samples)) == 1:
-            samples = samples.reshape(-1, 1)
+            if len(np.shape(samples)) == 1:
+                samples = samples.reshape(-1, 1)
 
-        self._samples = samples
+            self._samples = samples
 
-        print(f'{self.number_samples} samples with dimension '
-              f'{self.dimension_samples} were obtained. \n')
+            print(f'{self.number_samples} samples with dimension '
+                  f'{self.dimension_samples} were obtained. \n')
 
-        print('Bootstrapping...')
-        resampled_points = []
-        for _ in tqdm(range(number_bootstrap_samples)):
-            weight = weights().reshape(-1, 1)
-            resampled_points.append(1 / np.average(weight) * weight * self.samples)
+            print('Bootstrapping...')
+            resampled_points = []
+            for _ in tqdm(range(number_bootstrap_samples)):
+                weight = weights().reshape(-1, 1)
+                resampled_points.append(1 / np.average(weight) * weight * self.samples)
 
-        self._plain_bootstrapped_samples = np.array(resampled_points)
+            self._plain_bootstrapped_samples = np.array(resampled_points)
 
     @property
     def samples(self) -> np.ndarray:

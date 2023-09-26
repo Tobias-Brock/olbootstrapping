@@ -23,3 +23,7 @@ bootstrap = DiscreteBootstrap(samples=samples)
 print(f'Bootstrapped variance: \n {bootstrap.bootstrapped_variance}')
 
 print(f'True variance of empirical mean: {variance / number_sample_points}')
+
+print(f'Confidence interval: {bootstrap.bootstrapped_confidence_interval(alpha=0.05)}')
+
+bootstrap.save_to_csv('discrete_bootstrap_iid_samples')

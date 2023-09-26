@@ -7,7 +7,7 @@ def triangle_window(m, j):
     return 1 / m * (1 - np.abs(j) / m)
 
 
-class MovingAverage(Weights):
+class MovingAverageWeights(Weights):
     r"""Generates moving average weights
 
     .. epigraph::
