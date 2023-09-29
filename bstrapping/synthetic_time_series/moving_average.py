@@ -23,3 +23,7 @@ class MovingAverage:
             [np.sum(self.parameters[:q - i] * self.parameters[i:]) for i in range(1, len(self.parameters))])
 
         return np.sum(self.parameters ** 2) + 2 * dummy
+
+    @property
+    def variance(self) -> float:
+        return np.sum(self.parameters ** 2)
