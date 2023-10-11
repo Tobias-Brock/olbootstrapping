@@ -46,7 +46,7 @@ class WeightedBootstrap(Bootstrap):
     >>> true_variance = (1 + a) ** 2 / number_sample_points * variance
     0.002592
 
-    Initialize weights for the weighted bootstrap, here, we use the recursive defined weights for weakly dependent data
+    Initialize weights for the weighted bootstrap, here, we use the recursive defined weights for weakly dependent data_old
 
     >>> weights = AutoRegressiveWeights(samples=samples)
 

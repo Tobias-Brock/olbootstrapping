@@ -12,7 +12,7 @@ class MovingAverageWeights(Weights):
 
     .. epigraph::
         **When to apply:**
-        These weights are only valid for iid data.
+        These weights are only valid for iid data_old.
 
     Generate number-of-samples many realizations of moving average weights.
 
@@ -56,6 +56,7 @@ class MovingAverageWeights(Weights):
         """
 
         self._samples = samples
+        self._gamma_weights = None
 
     def __call__(self, ) -> np.ndarray:
         """Generate realizations of the sequence of weights
@@ -75,6 +76,7 @@ class MovingAverageWeights(Weights):
             np.random.gamma(q, 1 / q)
             for _ in range(number_sample_points + 2 * block_length)
         ]
+        self._gamma_weights = gamma_weights
 
         return np.array([
             np.sum([

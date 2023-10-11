@@ -8,7 +8,7 @@ class GaussianWeights(Weights):
 
     .. epigraph::
         **When to apply:**
-        These weights are only valid for iid data.
+        These weights are only valid for iid data_old.
 
     Generate number-of-samples many realizations of normally distributed iid random variables
     with mean and variance equal to one.

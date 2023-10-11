@@ -10,7 +10,7 @@ class Bootstrap:
     """
 
     def save_to_csv(self, file_name: str):
-        """Save data to csv file
+        """Save data_old to csv file
 
         Parameters
         ----------
@@ -22,7 +22,7 @@ class Bootstrap:
                        'plain_bootstrapped_samples': self.plain_bootstrapped_samples.tolist()}, f)
 
     def load_from_csv(self, file_path: str):
-        """Load data from csv file
+        """Load data_old from csv file
 
         Parameters
         ----------
