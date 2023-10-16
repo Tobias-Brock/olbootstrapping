@@ -31,7 +31,7 @@ pip install bstrapping
 You can clone this repository by running the following command:
 
 ```
-git clone https://github.com/nicolaipalm/bootstrap
+git clone
 cd bstrapping
 pip install
 ```
