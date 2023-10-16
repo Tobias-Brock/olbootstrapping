@@ -14,7 +14,7 @@ the distribution of the *arithmetic mean* of the real samples.
 Accordingly, we can use the synthetic samples in order to approximate the distribution of the
 arithmetic mean of the real samples.
 
-> **Caution**: bootstrapped samples do **not** approximate the distribution of the samples, but their arithmetic mean!
+> **Caution**: bootstrapped samples do **not** approximate the distribution of the samples, but of their arithmetic mean!
 
 However, with some mathematical tricks, one can apply bootstrapping to a multitude of scenarios
 where we are interested in some other statistic than the arithmetic mean (see [Advanced Usage]())
