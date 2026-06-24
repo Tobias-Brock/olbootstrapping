@@ -113,50 +113,15 @@ class OnlineARBootstrap(BaseARBootstrap):
             np.ndarray: Per-bootstrap deviations γ*_t (shape (B,)), i.e., the
             bootstrap increments to add to the current mean estimate.
         """
-        V_t = self._update_latents_and_multipliers(B, nu_eff=nu_eff, rho=rho)  # (B,1)
-        X_star_t = V_t * (x_t - mu_center)  # (B,1)
+        V_t = self._update_latents_and_multipliers(B, nu_eff=nu_eff, rho=rho)
+        X_star_t = V_t * (x_t - mu_center)
 
         self._offset_estimator.update(X_star_t)
         gamma_vec = np.asarray(
             self._instantaneous_from_estimator(self._offset_estimator), dtype=float
-        ).reshape(B)  # (B,)
-
-        return gamma_vec  # δ*_t
-
-    def _step_old_bootstrap(
-        self, t: int, x_t: float, mu_point_prev: float, B: int
-    ) -> np.ndarray:
-        """Compute bootstrap updates for the legacy (old) bootstrap path.
-
-        Args:
-            t (int): Current time index.
-            x_t (float): Observed value at time t.
-            mu_point_prev (float): Previous mean estimate used for anchoring.
-            B (int): Number of bootstrap replicates.
-
-        Returns:
-            np.ndarray: Per-bootstrap deviations (μ*t - μ{prev}) with shape (B,).
-        """
-        V_next = generate_recursive_weight_old(
-            i=t, V_i=self._prev_multiplier, alpha=self._alpha, rng=self._rng
-        )
-        self._prev_multiplier = V_next
-        v_vec = V_next.reshape(B)
-
-        self._num_estimator.update(v_vec * x_t)
-        num_point_vec = np.asarray(
-            self._instantaneous_from_estimator(self._num_estimator), dtype=float
         ).reshape(B)
 
-        if (self._den_running_mean is None) or (self._den_running_mean.shape[0] != B):
-            self._den_running_mean = v_vec.copy()
-        else:
-            self._den_running_mean += (v_vec - self._den_running_mean) / t
-
-        den = self._den_running_mean
-        den_safe = np.where(np.isfinite(den) & (np.abs(den) > 1e-12), den, 1.0)
-        mu_star_t = num_point_vec / den_safe
-        return mu_star_t - mu_point_prev
+        return gamma_vec
 
     def __call__(
         self, new_samples: np.ndarray, number_bootstrap_samples: Optional[int] = None
@@ -184,9 +149,6 @@ class OnlineARBootstrap(BaseARBootstrap):
             self._sigma2_star = 0.0
             self._m_running = np.zeros(B, dtype=float)
 
-            if self._old_bootstrap:
-                self._prev_multiplier = np.ones((B, 1), dtype=float)
-
         B = self._bootstrap_averages.shape[0]
 
         nu_eff = effective_sample_size(
@@ -197,7 +159,7 @@ class OnlineARBootstrap(BaseARBootstrap):
             seasonal_period=self.seasonal_period,
         )
         nu_eff = max(1.0, float(nu_eff))
-        rho = 1.0 - (nu_eff ** (-1.0 / 3.0))
+        rho = 1.0 - (nu_eff**self._rho_power)
 
         for _, sample in enumerate(new_samples):
             self._index_time = 0 if (self._index_time is None) else self._index_time
@@ -212,19 +174,9 @@ class OnlineARBootstrap(BaseARBootstrap):
                     else 0.0
                 )
 
-                if not self._old_bootstrap:
-                    delta_star_t = self._step_new_bootstrap(
-                        x_t=x_t, mu_center=mu_center, B=B, nu_eff=nu_eff, rho=rho
-                    )
-                else:
-                    mu_point_tmp = (
-                        float(self._instantaneous_from_estimator(self._data_estimator))
-                        if (self._last_mu_point is not None)
-                        else 0.0
-                    )
-                    delta_star_t = self._step_old_bootstrap(
-                        t=t, x_t=x_t, mu_point_prev=mu_point_tmp, B=B
-                    )
+                delta_star_t = self._step_new_bootstrap(
+                    x_t=x_t, mu_center=mu_center, B=B, nu_eff=nu_eff, rho=rho
+                )
 
                 self._data_estimator.update(x_t)
                 mu_point_now = float(
@@ -241,17 +193,9 @@ class OnlineARBootstrap(BaseARBootstrap):
                 float(self._last_mu_point) if (self._last_mu_point is not None) else 0.0
             )
 
-            if not self._old_bootstrap:
-                delta_star_t = self._step_new_bootstrap(
-                    x_t=x_t, mu_center=mu_center, B=B, nu_eff=nu_eff, rho=rho
-                )
-            else:
-                mu_point_tmp = float(
-                    self._instantaneous_from_estimator(self._data_estimator)
-                )
-                delta_star_t = self._step_old_bootstrap(
-                    t=t, x_t=x_t, mu_point_prev=mu_point_tmp, B=B
-                )
+            delta_star_t = self._step_new_bootstrap(
+                x_t=x_t, mu_center=mu_center, B=B, nu_eff=nu_eff, rho=rho
+            )
 
             v_hat = float(np.var(delta_star_t[: self._B1], ddof=0))
 

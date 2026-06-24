@@ -31,7 +31,8 @@ class MeanEstimator:
             n_series (int): Number of parallel series (1 for scalar).
             init_level (Optional[float|np.ndarray]): Initial level(s).
             init_trend (Optional[float|np.ndarray]): Initial trend(s) (for Holt/HW).
-            Seasonal period (Optional[int]): Seasonal period (required for 'holtwinters').
+            seasonal_period (Optional[int]): Seasonal period required for
+                'holtwinters'.
             gamma (Optional[float]): Seasonal smoothing for Holt–Winters.
             init_seasonal (Optional[array-like]): Initial seasonal indices.
             init_mode (Literal['simple','seasonal_mean']): Seasonal init mode.

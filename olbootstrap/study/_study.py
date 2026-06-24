@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from itertools import product
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from joblib import Parallel, delayed
 import numpy as np
@@ -76,18 +77,36 @@ class UniformCoverageStudy(BaseCoverageStudy):
             samples = process_k.generate_samples(self.sample_size)
 
             ekw = dict(self.experiment_kwargs)
+
+            # defaults, but don't overwrite method-specific overrides
             ekw.setdefault('alpha', float(self.alpha))
-            ekw['transform'] = str(self.transform)
+            ekw.setdefault('transform', str(self.transform))
             ekw.setdefault('transform_power', float(self.transform_power))
+            ekw.setdefault('rho_power', float(self.rho_power))
             ekw.setdefault('sample_size', int(self.sample_size))
             ekw.setdefault('burn_in', int(self.burn_in))
             ekw.setdefault('var_warmup', int(self.var_warmup))
-            ekw.setdefault('use_variance_smoothing', True)
+            ekw.setdefault('use_variance_smoothing', False)
+
+            method_label = ekw.get('method_label', None)
+            boot = ekw.get('bootstrap_cls', None)
+
+            if method_label == 'GaussMix':
+                from olbootstrap.online_bootstrap._online_gaussian_bootstrap import (
+                    OnlineGaussianMixtureAsympCSSmoothedBootstrap,
+                )
+
+                assert (
+                    boot is OnlineGaussianMixtureAsympCSSmoothedBootstrap
+                ), f"GaussMix mislabeled: bootstrap_cls={getattr(boot,'__name__',boot)}"
+
+            exp_kwargs = dict(ekw)
+            exp_kwargs.pop('method_label', None)  # keep for naming, don't pass to init
 
             exp = OnlineARBootstrapExperiment(
                 process=process_k,
                 rng_weights=rng_weights,
-                **ekw,
+                **exp_kwargs,
             )
             exp.run(samples=samples)
             exp.compute_intervals(quantile='normal')
@@ -178,7 +197,7 @@ class UniformCoverageStudy(BaseCoverageStudy):
                 seed_j = int(alpha_seeds[j].entropy)
                 job_args.append(
                     (
-                        UniformCoverageStudy,  # pass the study class
+                        UniformCoverageStudy,
                         float(eta),
                         self.process_template,
                         int(self.sample_size),
@@ -190,6 +209,7 @@ class UniformCoverageStudy(BaseCoverageStudy):
                         int(seed_j),
                         transform_val,
                         float(self.transform_power),
+                        float(self.rho_power),
                     )
                 )
 
@@ -215,8 +235,8 @@ class UniformCoverageStudy(BaseCoverageStudy):
                 ekw.setdefault('sample_size', int(self.sample_size))
                 ekw.setdefault('burn_in', int(self.burn_in))
                 ekw.setdefault('var_warmup', int(self.var_warmup))
-                ekw['transform'] = str(transform_val)
-                ekw.setdefault('use_variance_smoothing', True)
+                ekw.setdefault('transform', str(self.transform))
+                ekw.setdefault('use_variance_smoothing', False)
 
                 substudy = UniformCoverageStudy(
                     process_template=self.process_template,
@@ -230,6 +250,7 @@ class UniformCoverageStudy(BaseCoverageStudy):
                     progress=self.progress,
                     transform=transform_val,
                     transform_power=float(self.transform_power),
+                    rho_power=float(self.rho_power),
                 )
                 res = substudy.run(position=1)
 
@@ -275,34 +296,38 @@ class UniformCoverageStudy(BaseCoverageStudy):
         *,
         transform: str = 'student',
         transform_power: float = 1.0 / 3.0,
+        rho_power: float = (-1.0 / 3.0),
         var_warmup: int = 0,
-        save: bool = True,  # <-- new flag
+        save: bool = True,
     ) -> Dict[str, Dict[str, Any]]:
         """Run sweeps over DGP and experiment overrides.
 
         Args:
-            base_process_template: Prototype process instance to clone/modify.
-            sample_size: Number of time points per series.
-            dgp_overrides: List of dicts with DGP parameter overrides.
-            exp_kwargs_overrides: List of dicts with experiment kwargs overrides.
-            smoothing_grid: Grid of smoothing parameters to evaluate.
-            outdir: Directory where sweep files will be stored.
-            n_series: Number of series per sweep.
-            burn_in: Burn-in length for experiments.
-            alpha: Nominal significance level.
-            base_exp_kwargs: Base experiment kwargs applied before overrides.
-            seed: RNG seed for reproducibility.
-            progress: If True, show progress bars.
-            parallel: If True, allow internal parallelization for smoothing sweep.
-            n_jobs: Number of workers for parallel execution.
-            verbose: Verbosity level passed to joblib.
-            transform: Multiplier transform to use in experiments.
-            transform_power: Power mapping effective sample size to df.
-            var_warmup: Variance warmup length.
-            save: If True save each sweep to disk (default True).
+            base_process_template: Process template to clone for each run.
+            sample_size (int, optional): Number of samples per simulated series.
+            dgp_overrides (Optional[List[dict]], optional): Process parameter
+                overrides.
+            exp_kwargs_overrides (Optional[List[dict]], optional): Experiment
+                keyword overrides.
+            smoothing_grid (Sequence[float], optional): Smoothing values.
+            outdir (Union[str, Path], optional): Output directory.
+            n_series (int, optional): Number of simulated series per setting.
+            burn_in (int, optional): Burn-in length.
+            alpha (float, optional): Nominal significance level.
+            base_exp_kwargs (Optional[dict], optional): Base experiment kwargs.
+            seed (Optional[int], optional): Master RNG seed.
+            progress (bool, optional): If True, show progress bars.
+            parallel (bool, optional): If True, run jobs in parallel.
+            n_jobs (int, optional): Number of joblib workers.
+            verbose (int, optional): Joblib verbosity.
+            transform (str, optional): Multiplier transform.
+            transform_power (float, optional): Transform power.
+            rho_power (float, optional): Latent correlation exponent.
+            var_warmup (int, optional): Variance warmup length.
+            save (bool, optional): If True, save sweep files to `outdir`.
 
         Returns:
-            Dict[str, Dict[str, Any]]: Mapping of sweep-name -> {sweep, path, name}.
+            Dict[str, Dict[str, Any]]: Sweep outputs keyed by run name.
         """
         outdir = Path(outdir)
         if save:
@@ -323,6 +348,7 @@ class UniformCoverageStudy(BaseCoverageStudy):
         outer_iter = tqdm(combos, desc='combo runs', disable=not progress)
 
         proc_label = type(base_process_template).__name__
+
         for combo_idx, ((_, dgp_ov), (i_exp, exp_ov)) in enumerate(outer_iter):
             this_seed = int(child_seeds[combo_idx].entropy)
             rng = np.random.default_rng(this_seed)
@@ -334,10 +360,12 @@ class UniformCoverageStudy(BaseCoverageStudy):
             ekw.setdefault('alpha', float(alpha))
             ekw.setdefault('transform', str(transform))
             ekw.setdefault('transform_power', float(transform_power))
+            ekw.setdefault('rho_power', float(rho_power))
             ekw.setdefault('sample_size', int(sample_size))
             ekw.setdefault('burn_in', int(burn_in))
             ekw.setdefault('var_warmup', int(var_warmup))
-            ekw.setdefault('use_variance_smoothing', True)
+            ekw.setdefault('use_variance_smoothing', False)
+            effective_tr = ekw.get('transform', transform)
 
             smooth_part = (
                 ekw.get('smoothing_method')
@@ -348,27 +376,54 @@ class UniformCoverageStudy(BaseCoverageStudy):
             eta_part = ekw.get('eta', ekw.get('smoothing_alpha', None))
             B_val = int(ekw.get('B', base_exp_kwargs.get('B', 0)))
 
+            is_garch = all(hasattr(proc_variant, a) for a in ('omega', 'alpha', 'beta'))
+
             if hasattr(proc_variant, 'parameters'):
                 try:
                     params = np.asarray(proc_variant.parameters)
                     q = int(getattr(proc_variant, 'q', params.size))
                 except Exception:
                     q = getattr(proc_variant, 'q', None) or 'NA'
+
                 dgp_id = f'ma-q{q}'
 
             elif hasattr(proc_variant, 'phi'):
-                dgp_id = f'phi-{cls._safe_str(proc_variant.phi)}'
-            elif all(hasattr(proc_variant, a) for a in ('omega', 'alpha', 'beta')):
-                dgp_id = 'garch-' + cls._safe_str(
-                    {
-                        'omega': proc_variant.omega,
-                        'alpha': proc_variant.alpha,
-                        'beta': proc_variant.beta,
-                    }
-                )
+                phi_arr = np.asarray(proc_variant.phi, dtype=float).reshape(-1)
+
+                if phi_arr.size == 1:
+                    # Keep previous AR(1) naming unchanged.
+                    dgp_id = f'phi-{cls._safe_str(proc_variant.phi)}'
+                else:
+                    # Compact AR(p) naming for rebuttal processes.
+                    p = int(phi_arr.size)
+                    nz = int(np.sum(np.abs(phi_arr) > 1e-12))
+                    mass = float(np.sum(phi_arr))
+                    dgp_id = f'ar{p}' f'-nz{nz}' f'-mass{cls._safe_str(round(mass, 4))}'
+
+                if bool(getattr(proc_variant, 'structural_break', False)):
+                    sb_times = getattr(proc_variant, 'structural_break_times', None)
+                    sb_single = getattr(proc_variant, 'break_time', None)
+                    sb_random = int(getattr(proc_variant, 'n_structural_breaks', 0))
+
+                    if sb_times is not None:
+                        n_sb = len(sb_times)
+                    elif sb_single is not None:
+                        n_sb = 1
+                    elif sb_random > 0:
+                        n_sb = sb_random
+                    else:
+                        n_sb = 1
+
+                    dgp_id += f'__SB{n_sb}'
+
+            elif is_garch:
+                # Compact GARCH naming. Do not include omega/alpha/beta or nonlinear settings.
+                dgp_id = 'garch'
+
             else:
                 dgp_id = 'dgp'
 
+            # Keep old AR shock naming, but suppress useless default no-shock info for GARCH.
             if any(
                 hasattr(proc_variant, k)
                 for k in ('shock_type', 'jump_prob', 'jump_scale', 'decay')
@@ -377,24 +432,35 @@ class UniformCoverageStudy(BaseCoverageStudy):
                 jp = getattr(proc_variant, 'jump_prob', 0.0)
                 js = getattr(proc_variant, 'jump_scale', 1.0)
                 dc = getattr(proc_variant, 'decay', None)
-                shock_bits = [
-                    f'type-{cls._safe_str(st)}',
-                    f'p-{cls._safe_str(jp)}',
-                    f'scale-{cls._safe_str(js)}',
-                ]
-                if dc is not None:
-                    shock_bits.append(f'decay-{cls._safe_str(dc)}')
-                dgp_id += '__shock-' + '_'.join(shock_bits)
+
+                is_default_no_shock = (
+                    str(st) == 'none' and float(jp) == 0.0 and float(js) == 1.0
+                )
+
+                if not (is_garch and is_default_no_shock):
+                    shock_bits = [
+                        f'type-{cls._safe_str(st)}',
+                        f'p-{cls._safe_str(jp)}',
+                        f'scale-{cls._safe_str(js)}',
+                    ]
+                    if dc is not None:
+                        shock_bits.append(f'decay-{cls._safe_str(dc)}')
+
+                    dgp_id += '__shock-' + '_'.join(shock_bits)
+
+            method_label = ekw.get('method_label', None)
 
             name_parts: List[str] = [
                 f'proc-{cls._safe_str(proc_label)}',
                 dgp_id,
                 f'smooth-{cls._safe_str(smooth_part)}',
             ]
+
             if eta_part is not None:
                 name_parts.append(f'eta-{cls._safe_str(eta_part)}')
+
             name_parts += [
-                f'tr-{cls._safe_str(transform)}',
+                f'tr-{cls._safe_str(effective_tr)}',
                 f'bi-{cls._safe_str(burn_in)}',
                 f'vw-{cls._safe_str(var_warmup)}',
                 f'alpha-{cls._safe_str(alpha)}',
@@ -402,8 +468,12 @@ class UniformCoverageStudy(BaseCoverageStudy):
                 f'nseries-{cls._safe_str(n_series)}',
                 f'B-{cls._safe_str(B_val)}',
             ]
+
             if not bool(ekw.get('use_variance_smoothing', True)):
                 name_parts.append('nosmooth-var')
+
+            if method_label is not None:
+                name_parts.append(f'method-{cls._safe_str(method_label)}')
 
             default_tp = 1.0 / 3.0
             rel_tol, abs_tol = 1e-12, 1e-12
@@ -415,7 +485,11 @@ class UniformCoverageStudy(BaseCoverageStudy):
 
             trend_slope = getattr(proc_variant, 'trend_slope', None)
             if trend_slope not in (None, 0.0):
-                name_parts.append(f'trend-{cls._safe_str(trend_slope)}')
+                if bool(getattr(proc_variant, 'quadratic_trend', False)):
+                    name_parts.append(f'qtrend-{cls._safe_str(trend_slope)}')
+                else:
+                    # Keep previous linear trend naming unchanged.
+                    name_parts.append(f'trend-{cls._safe_str(trend_slope)}')
 
             sea_amp = getattr(proc_variant, 'seasonal_amplitude', None)
             sea_per = getattr(proc_variant, 'seasonal_period', None)
@@ -425,7 +499,7 @@ class UniformCoverageStudy(BaseCoverageStudy):
                     name_parts.append(f'seaP-{cls._safe_str(sea_per)}')
 
             name = '__'.join(name_parts)
-            save_path = (outdir / f'sweep_{name}.npz') if save else None
+            save_path = (outdir / f'{name}.npz') if save else None
 
             study = cls(
                 process_template=proc_variant,
@@ -439,6 +513,7 @@ class UniformCoverageStudy(BaseCoverageStudy):
                 progress=progress,
                 transform=transform,
                 transform_power=transform_power,
+                rho_power=rho_power,
             )
 
             sweep = study.run_smoothing_sweep(
@@ -456,3 +531,477 @@ class UniformCoverageStudy(BaseCoverageStudy):
             }
 
         return results
+
+
+@dataclass
+class UniformCoverageTestRun:
+    """Container for a coverage run augmented with testing outputs.
+
+    Args:
+        series_uniform_ok (np.ndarray): Per-series uniform coverage indicators.
+        series_uniform_frac (np.ndarray): Per-series uniform time fractions.
+        avg_uniform_time_fraction (float): Average uniform time fraction.
+        uniform_over_series_uniform (float): Fraction of series uniformly covered.
+        times (np.ndarray): Recorded time indices.
+        tau (np.ndarray): First rejection times per series.
+        rejected (np.ndarray): Per-series final rejection indicators.
+        reject_rate_final (float): Final rejection rate over series.
+        power_curve (np.ndarray): Reject-by-time power curve.
+        burn_eff (int): Effective burn-in plus variance warmup.
+        alpha (float): Nominal significance level.
+    """
+
+    series_uniform_ok: np.ndarray
+    series_uniform_frac: np.ndarray
+    avg_uniform_time_fraction: float
+    uniform_over_series_uniform: float
+    times: np.ndarray
+    tau: np.ndarray
+    rejected: np.ndarray
+    reject_rate_final: float
+    power_curve: np.ndarray
+    burn_eff: int
+    alpha: float
+
+
+class UniformCoverageStudyWithTesting(UniformCoverageStudy):
+    """Extends UniformCoverageStudy by computing hypothesis testing quantities."""
+
+    @staticmethod
+    def _tau_from_uniform_band(
+        *,
+        times: np.ndarray,
+        uL_all: np.ndarray,
+        uU_all: np.ndarray,
+        target_at_recorded: np.ndarray,
+        burn_eff: int,
+    ) -> float:
+        """Compute the first time a uniform band excludes the target.
+
+        Args:
+            times (np.ndarray): Recorded time indices.
+            uL_all (np.ndarray): Uniform lower bounds at recorded times.
+            uU_all (np.ndarray): Uniform upper bounds at recorded times.
+            target_at_recorded (np.ndarray): Target values at recorded times.
+            burn_eff (int): Effective burn-in plus variance warmup.
+
+        Returns:
+            float: First rejection time, or infinity if no rejection occurs.
+        """
+        times = np.asarray(times, dtype=int)
+        uL_all = np.asarray(uL_all, dtype=float)
+        uU_all = np.asarray(uU_all, dtype=float)
+        target_at_recorded = np.asarray(target_at_recorded, dtype=float)
+
+        T = min(times.size, uL_all.size, uU_all.size, target_at_recorded.size)
+        times = times[:T]
+        uL_all = uL_all[:T]
+        uU_all = uU_all[:T]
+        target_at_recorded = target_at_recorded[:T]
+
+        ok = (
+            (times > int(burn_eff))
+            & np.isfinite(uL_all)
+            & np.isfinite(uU_all)
+            & np.isfinite(target_at_recorded)
+        )
+        if not np.any(ok):
+            return float('inf')
+
+        out = ok & ((target_at_recorded < uL_all) | (target_at_recorded > uU_all))
+        if not np.any(out):
+            return float('inf')
+
+        return float(times[np.argmax(out)])
+
+    @staticmethod
+    def _power_curve_from_tau(times: np.ndarray, tau: np.ndarray) -> np.ndarray:
+        """Convert first rejection times to a reject-by-time power curve.
+
+        Args:
+            times (np.ndarray): Recorded time indices.
+            tau (np.ndarray): First rejection times per series.
+
+        Returns:
+            np.ndarray: Empirical rejection probability at each recorded time.
+        """
+        times = np.asarray(times, dtype=int)
+        tau = np.asarray(tau, dtype=float)
+        return np.mean(tau[:, None] <= times[None, :], axis=0)
+
+    def run(self, position: int = 0, leave_inner: bool = False) -> Dict[str, Any]:
+        """Run coverage and testing replications.
+
+        Args:
+            position (int, optional): Progress-bar display position.
+            leave_inner (bool, optional): If True, leave nested progress bars.
+
+        Returns:
+            Dict[str, Any]: Coverage summaries plus tau, rejection, and power data.
+
+        Raises:
+            RuntimeError: If recorded times differ across replications.
+        """
+        out_cov = super().run(position=position, leave_inner=leave_inner)
+        master = np.random.SeedSequence(self.seed)
+        rep_seqs = master.spawn(self.n_series)
+
+        tau_list: List[float] = []
+        times_ref: Optional[np.ndarray] = None
+
+        rep_iter = (
+            tqdm(
+                range(self.n_series),
+                desc='testing (tau)',
+                total=self.n_series,
+                position=position,
+                leave=leave_inner,
+                dynamic_ncols=True,
+                mininterval=0.1,
+            )
+            if self.progress
+            else range(self.n_series)
+        )
+
+        for k in rep_iter:
+            data_seq, weights_seq = rep_seqs[k].spawn(2)
+            rng_data = np.random.default_rng(data_seq)
+            rng_weights = np.random.default_rng(weights_seq)
+
+            process_k = self._clone_process(
+                self.process_template, overrides={}, rng=rng_data
+            )
+            samples = process_k.generate_samples(self.sample_size)
+
+            ekw = dict(self.experiment_kwargs)
+            ekw.setdefault('alpha', float(self.alpha))
+            ekw.setdefault('transform', str(self.transform))
+            ekw.setdefault('transform_power', float(self.transform_power))
+            ekw.setdefault('rho_power', float(self.rho_power))
+            ekw.setdefault('sample_size', int(self.sample_size))
+            ekw.setdefault('burn_in', int(self.burn_in))
+            ekw.setdefault('var_warmup', int(self.var_warmup))
+            ekw.setdefault('use_variance_smoothing', False)
+
+            exp_kwargs = dict(ekw)
+            exp_kwargs.pop('method_label', None)
+
+            exp = OnlineARBootstrapExperiment(
+                process=process_k,
+                rng_weights=rng_weights,
+                **exp_kwargs,
+            )
+            exp.run(samples=samples)
+
+            times = np.asarray(exp.times, dtype=int)
+            uL_all = np.asarray(
+                getattr(exp, '_uniform_lower_all', np.full(times.shape, np.nan)),
+                dtype=float,
+            )
+            uU_all = np.asarray(
+                getattr(exp, '_uniform_upper_all', np.full(times.shape, np.nan)),
+                dtype=float,
+            )
+            target_full = exp._smoother_target_series(testing=True)  # length n
+            target_at_recorded = np.asarray(target_full, float)[times - 1]
+
+            burn_eff = int(exp.t0) + int(exp.var_warmup)
+
+            tau_k = self._tau_from_uniform_band(
+                times=times,
+                uL_all=uL_all,
+                uU_all=uU_all,
+                target_at_recorded=target_at_recorded,
+                burn_eff=burn_eff,
+            )
+            tau_list.append(tau_k)
+
+            if times_ref is None:
+                times_ref = times.copy()
+            else:
+                if times_ref.shape != times.shape or not np.all(times_ref == times):
+                    raise RuntimeError(
+                        'Recorded times differ across reps; cannot build a single power curve.'
+                    )
+
+        tau = np.asarray(tau_list, dtype=float)
+        assert times_ref is not None
+        times = times_ref
+
+        rejected = np.isfinite(tau)
+        reject_rate_final = float(np.mean(rejected))
+        power_curve = self._power_curve_from_tau(times, tau)
+
+        burn_eff = int(self.burn_in) + int(self.var_warmup)
+
+        return {
+            **out_cov,
+            'times': times,
+            'tau': tau,
+            'rejected': rejected,
+            'reject_rate_final': reject_rate_final,
+            'power_curve': power_curve,
+            'burn_eff': burn_eff,
+            'alpha': float(self.alpha),
+        }
+
+    def run_with_testing(
+        self, position: int = 0, leave_inner: bool = False
+    ) -> UniformCoverageTestRun:
+        """Return testing outputs as a structured dataclass.
+
+        Args:
+            position (int, optional): Progress-bar display position.
+            leave_inner (bool, optional): If True, leave nested progress bars.
+
+        Returns:
+            UniformCoverageTestRun: Structured coverage and testing outputs.
+        """
+        d = self.run(position=position, leave_inner=leave_inner)
+        return UniformCoverageTestRun(
+            series_uniform_ok=np.asarray(d['series_uniform_ok'], dtype=bool),
+            series_uniform_frac=np.asarray(d['series_uniform_frac'], dtype=float),
+            avg_uniform_time_fraction=float(d['avg_uniform_time_fraction']),
+            uniform_over_series_uniform=float(d['uniform_over_series_uniform']),
+            times=np.asarray(d['times'], dtype=int),
+            tau=np.asarray(d['tau'], dtype=float),
+            rejected=np.asarray(d['rejected'], dtype=bool),
+            reject_rate_final=float(d['reject_rate_final']),
+            power_curve=np.asarray(d['power_curve'], dtype=float),
+            burn_eff=int(d['burn_eff']),
+            alpha=float(d['alpha']),
+        )
+
+    @classmethod
+    def _save_power_run(
+        cls,
+        *,
+        path: Union[str, Path],
+        result: Any,
+        meta: Dict[str, Any],
+    ) -> None:
+        """Save a single power/coverage+testing run to npz.
+
+        Args:
+            path (Union[str, Path]): Output `.npz` path.
+            result (Any): Object returned by `run_with_testing`.
+            meta (Dict[str, Any]): Metadata to store with the run.
+
+        Returns:
+            None
+        """
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        np.savez_compressed(
+            str(path),
+            times=np.asarray(result.times, dtype=int),
+            power_curve=np.asarray(result.power_curve, dtype=float),
+            tau=np.asarray(result.tau, dtype=float),
+            rejected=np.asarray(result.rejected, dtype=bool),
+            series_uniform_ok=np.asarray(result.series_uniform_ok, dtype=bool),
+            series_uniform_frac=np.asarray(result.series_uniform_frac, dtype=float),
+            uniform_over_series_uniform=float(result.uniform_over_series_uniform),
+            avg_uniform_time_fraction=float(result.avg_uniform_time_fraction),
+            reject_rate_final=float(result.reject_rate_final),
+            burn_eff=int(result.burn_eff),
+            alpha=float(result.alpha),
+            meta=np.array(meta, dtype=object),
+        )
+
+    @classmethod
+    def run_power_sweep(
+        cls,
+        *,
+        base_process_template,
+        etas: Sequence[float],
+        phis: Sequence[float],
+        trend_slopes: Sequence[float],
+        sample_size: int = 3500,
+        n_series: int = 100,
+        burn_in: int = 500,
+        var_warmup: int = 400,
+        alpha: float = 0.1,
+        base_exp_kwargs: Optional[dict] = None,
+        outdir: Union[str, Path] = Path('..') / 'experiments_power',
+        seed: Optional[int] = None,
+        progress: bool = True,
+        parallel: bool = True,
+        n_jobs: int = -1,
+        verbose: int = 10,
+        transform: str = 'student',
+        transform_power: float = 1.0 / 3.0,
+        rho_power: float = (-1.0 / 3.0),
+        save: bool = True,
+    ) -> Dict[str, Dict[str, Any]]:
+        """Run power experiments over eta, phi, and trend grids.
+
+        Args:
+            base_process_template: Process template to clone for each run.
+            etas (Sequence[float]): Smoothing values to evaluate.
+            phis (Sequence[float]): AR coefficient values to evaluate.
+            trend_slopes (Sequence[float]): Trend slopes to evaluate.
+            sample_size (int, optional): Number of samples per simulated series.
+            n_series (int, optional): Number of simulated series per setting.
+            burn_in (int, optional): Burn-in length.
+            var_warmup (int, optional): Variance warmup length.
+            alpha (float, optional): Nominal significance level.
+            base_exp_kwargs (Optional[dict], optional): Base experiment kwargs.
+            outdir (Union[str, Path], optional): Output directory.
+            seed (Optional[int], optional): Master RNG seed.
+            progress (bool, optional): If True, show progress bars.
+            parallel (bool, optional): If True, run jobs in parallel.
+            n_jobs (int, optional): Number of joblib workers.
+            verbose (int, optional): Joblib verbosity.
+            transform (str, optional): Multiplier transform.
+            transform_power (float, optional): Transform power.
+            rho_power (float, optional): Latent correlation exponent.
+            save (bool, optional): If True, save power files to `outdir`.
+
+        Returns:
+            Dict[str, Dict[str, Any]]: Power outputs keyed by run name.
+        """
+        outdir = Path(outdir)
+        if save:
+            outdir.mkdir(parents=True, exist_ok=True)
+
+        base_exp_kwargs = {} if base_exp_kwargs is None else dict(base_exp_kwargs)
+
+        etas = [float(x) for x in etas]
+        phis = [float(x) for x in phis]
+        trend_slopes = [float(x) for x in trend_slopes]
+
+        n_total = len(etas) * len(phis) * len(trend_slopes)
+        ss = np.random.SeedSequence(seed)
+        child_seeds = ss.spawn(n_total)
+
+        jobs: List[Tuple[float, float, float, int]] = []
+        idx = 0
+        for eta in etas:
+            for phi in phis:
+                for ts in trend_slopes:
+                    jobs.append((eta, phi, ts, int(child_seeds[idx].entropy)))
+                    idx += 1
+
+        proc_label = type(base_process_template).__name__
+
+        def _run_one(eta: float, phi: float, ts: float, cfg_seed: int):
+            """Run one power-grid configuration.
+
+            Args:
+                eta (float): Smoothing value.
+                phi (float): AR coefficient value.
+                ts (float): Trend slope value.
+                cfg_seed (int): Configuration-specific RNG seed.
+
+            Returns:
+                tuple: `(name, result, save_path, meta)` for the configuration.
+            """
+            rng = np.random.default_rng(cfg_seed)
+            proc = cls._clone_process(
+                base_process_template,
+                overrides={'phi': phi, 'trend_slope': ts},
+                rng=rng,
+            )
+
+            ekw = dict(base_exp_kwargs)
+            ekw['eta'] = float(eta)
+            ekw.setdefault('alpha', float(alpha))
+            ekw.setdefault('transform', str(transform))
+            ekw.setdefault('transform_power', float(transform_power))
+            ekw.setdefault('rho_power', float(rho_power))
+            ekw.setdefault('sample_size', int(sample_size))
+            ekw.setdefault('burn_in', int(burn_in))
+            ekw.setdefault('var_warmup', int(var_warmup))
+            ekw.setdefault('use_variance_smoothing', False)
+
+            method_label = ekw.get('method_label', None)
+            exp_kwargs = dict(ekw)
+            exp_kwargs.pop('method_label', None)
+
+            name_parts = [
+                f'proc-{cls._safe_str(proc_label)}',
+                f'phi-{cls._safe_str(phi)}',
+                f'trend-{cls._safe_str(ts)}',
+                f"smooth-{cls._safe_str(exp_kwargs.get('smoothing_method', 'NA'))}",
+                f'eta-{cls._safe_str(eta)}',
+                f"tr-{cls._safe_str(exp_kwargs.get('transform', transform))}",
+                f'bi-{cls._safe_str(burn_in)}',
+                f'vw-{cls._safe_str(var_warmup)}',
+                f'alpha-{cls._safe_str(alpha)}',
+                f'n-{cls._safe_str(sample_size)}',
+                f'nseries-{cls._safe_str(n_series)}',
+                f"B-{cls._safe_str(int(exp_kwargs.get('B', 0)))}",
+            ]
+            if not bool(exp_kwargs.get('use_variance_smoothing', True)):
+                name_parts.append('nosmooth-var')
+            if method_label is not None:
+                name_parts.append(f'method-{cls._safe_str(method_label)}')
+            seaA = getattr(proc, 'seasonal_amplitude', 0.0)
+            seaP = getattr(proc, 'seasonal_period', None)
+            if seaA not in (None, 0.0):
+                name_parts.append(f'seaA-{cls._safe_str(seaA)}')
+                name_parts.append(f'seaP-{cls._safe_str(seaP)}')
+
+            name = '__'.join(name_parts)
+            save_path = (outdir / f'{name}.npz') if save else None
+
+            study = cls(
+                process_template=proc,
+                sample_size=int(sample_size),
+                experiment_kwargs=ekw,
+                n_series=int(n_series),
+                burn_in=int(burn_in),
+                var_warmup=int(var_warmup),
+                alpha=float(alpha),
+                seed=int(cfg_seed),
+                progress=False,
+                transform=str(transform),
+                transform_power=float(transform_power),
+                rho_power=float(rho_power),
+            )
+
+            result = study.run_with_testing()
+
+            meta = {
+                'name': name,
+                'seed': int(cfg_seed),
+                'eta': float(eta),
+                'phi': float(phi),
+                'trend_slope': float(ts),
+                'sample_size': int(sample_size),
+                'n_series': int(n_series),
+                'burn_in': int(burn_in),
+                'var_warmup': int(var_warmup),
+                'alpha': float(alpha),
+                'experiment_kwargs': dict(ekw),
+            }
+
+            if save_path is not None:
+                cls._save_power_run(path=save_path, result=result, meta=meta)
+
+            return name, result, save_path, meta
+
+        if parallel:
+            it = jobs
+            results = Parallel(n_jobs=n_jobs, backend='loky', verbose=verbose)(
+                delayed(_run_one)(eta, phi, ts, cfg_seed)
+                for (eta, phi, ts, cfg_seed) in it
+            )
+        else:
+            iterator = tqdm(jobs, desc='power grid', disable=not progress)
+            results = [
+                _run_one(eta, phi, ts, cfg_seed)
+                for (eta, phi, ts, cfg_seed) in iterator
+            ]
+
+        out: Dict[str, Dict[str, Any]] = {}
+        for name, result, save_path, meta in results:
+            out[name] = {
+                'result': result,
+                'path': save_path,
+                'name': name,
+                'meta': meta,
+            }
+
+        return out

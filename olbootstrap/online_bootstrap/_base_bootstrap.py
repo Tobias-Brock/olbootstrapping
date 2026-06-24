@@ -26,11 +26,11 @@ class BaseARBootstrap(ABC):
         gamma: Optional[float] = None,
         seasonal_period: Optional[int] = None,
         forecast_s: int = 0,
-        old_bootstrap: bool = False,
         rng: np.random.Generator | None = None,
-        transform: str = 'student',  # "student" or "gauss"
-        use_variance_smoothing: bool = True,
+        transform: str = 'student',
+        use_variance_smoothing: bool = False,
         transform_power: float = 1.0 / 3.0,
+        rho_power: float = (-1.0 / 3.0),
         K: int = None,
         t0: int = None,
         alpha: float = 0.05,
@@ -52,11 +52,11 @@ class BaseARBootstrap(ABC):
             gamma: Optional seasonal smoothing parameter.
             seasonal_period: Optional seasonal period (int) for seasonal smoothers.
             forecast_s: Forecast horizon used when querying estimators.
-            old_bootstrap: If True, use the legacy bootstrap method.
             rng: NumPy random generator (defaults to ``np.random.default_rng()``).
             transform: Which reference transform to use, e.g. 'student' or 'gauss'.
             use_variance_smoothing: Whether to apply variance smoothing updates.
             transform_power: Power used in transform-related scaling (float).
+            rho_power: Exponent used for rho scaling (float).
             K: Number of dyadic boundary steps (int).
             t0: Starting time index for calibration window logic.
             alpha: Nominal significance level used for quantile computations.
@@ -70,8 +70,8 @@ class BaseARBootstrap(ABC):
         self.t0 = t0
         self._var_warmup = max(0, int(var_warmup))
         self._transform_power = float(transform_power)
+        self._rho_power = float(rho_power)
 
-        self._old_bootstrap = bool(old_bootstrap)
         self._forecast_horizon = int(forecast_s)
         self._rng = rng or np.random.default_rng()
         self.use_variance_smoothing = bool(use_variance_smoothing)
@@ -91,9 +91,9 @@ class BaseARBootstrap(ABC):
         self._K = int(K)
         self._alpha = float(alpha)
 
-        self._delta_star: Optional[np.ndarray] = None  # (B,)
+        self._delta_star: Optional[np.ndarray] = None
         self._sigma_star: Optional[float] = None
-        self._m_running: Optional[np.ndarray] = None  # (B,)
+        self._m_running: Optional[np.ndarray] = None
         self._q_active: Optional[float] = None
         self._q_history: Dict[int, float] = {}
 
@@ -162,40 +162,37 @@ class BaseARBootstrap(ABC):
             n_series=B,
         )
 
-        if self._old_bootstrap:
-            self._num_estimator = MeanEstimator(
-                method=self._smoothing_method,
-                eta=self.eta,
-                beta=self._beta,
-                gamma=self._gamma,
-                seasonal_period=self.seasonal_period,
-                n_series=B,
-            )
-            self._den_estimator = MeanEstimator(
-                method=self._smoothing_method,
-                eta=self.eta,
-                beta=self._beta,
-                gamma=self._gamma,
-                seasonal_period=self.seasonal_period,
-                n_series=B,
-            )
-
     def _instantaneous_from_estimator(self, est: MeanEstimator):
-        """Return the instantaneous/fitted point from `est` (level or forecast)."""
+        """Return the instantaneous fitted point from an estimator.
+
+        Args:
+            est (MeanEstimator): Mean estimator to query.
+
+        Returns:
+            float or np.ndarray: Current level or forecast at `forecast_s`.
+        """
         return est.forecast(m=self._forecast_horizon)
 
     @abstractmethod
     def _step_new_bootstrap(
         self, x_t: float, mu_point: float, B: int, *, nu_eff: float, rho: float
     ) -> tuple[np.ndarray, np.ndarray, float]:
-        """Compute (mu_star_t, delta_star_t, sigma_star) for the new path."""
-        raise NotImplementedError
+        """Compute bootstrap state for one new observation.
 
-    @abstractmethod
-    def _step_old_bootstrap(
-        self, t: int, x_t: float, mu_point: float, B: int
-    ) -> tuple[np.ndarray, np.ndarray, float]:
-        """Compute (mu_star_t, delta_star_t, sigma_star) for the old path."""
+        Args:
+            x_t (float): New observed value.
+            mu_point (float): Current or previous smoothed point estimate.
+            B (int): Number of bootstrap replicates.
+            nu_eff (float): Effective sample size for the smoother.
+            rho (float): Latent autoregressive correlation parameter.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray, float]: Bootstrap paths, bootstrap
+                deviations, and scale estimate for the new observation.
+
+        Raises:
+            NotImplementedError: Always raised by the abstract base method.
+        """
         raise NotImplementedError
 
     @abstractmethod
@@ -204,7 +201,19 @@ class BaseARBootstrap(ABC):
         new_samples: np.ndarray,
         number_bootstrap_samples: Optional[int] = None,
     ) -> None:
-        """Process a batch of new samples online and update the bootstrap state."""
+        """Process a batch of new samples online and update bootstrap state.
+
+        Args:
+            new_samples (np.ndarray): Incoming observations.
+            number_bootstrap_samples (Optional[int], optional): Optional number
+                of bootstrap replicates used to initialize the state.
+
+        Returns:
+            None
+
+        Raises:
+            NotImplementedError: Always raised by the abstract base method.
+        """
         raise NotImplementedError
 
     @property

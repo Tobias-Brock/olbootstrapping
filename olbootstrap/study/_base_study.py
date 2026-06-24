@@ -12,6 +12,22 @@ from olbootstrap.experiments._experiments import OnlineARBootstrapExperiment
 
 @dataclass
 class SweepResults:
+    """Container for coverage sweep summaries over smoothing rates.
+
+    Args:
+        eta (np.ndarray): Smoothing rates evaluated in the sweep.
+        avg_pointwise_time_fraction (np.ndarray): Average pointwise coverage
+            fraction over time.
+        avg_uniform_time_fraction (np.ndarray): Average uniform coverage fraction
+            over time.
+        uniform_over_series_pointwise (np.ndarray): Fraction of series with full
+            pointwise coverage over time.
+        uniform_over_series_uniform (np.ndarray): Fraction of series with full
+            uniform coverage over time.
+        avg_uniform_mean_width (np.ndarray): Average uniform band widths.
+        alpha (Optional[float], optional): Nominal significance level.
+    """
+
     eta: np.ndarray
     avg_pointwise_time_fraction: np.ndarray
     avg_uniform_time_fraction: np.ndarray
@@ -38,6 +54,7 @@ class BaseCoverageStudy(ABC):
         progress: bool = False,
         transform: Optional[str] = 'student',
         transform_power: float = 1.0 / 3.0,
+        rho_power: float = (-1.0 / 3.0),
     ):
         """Initialize study settings and storage.
 
@@ -54,6 +71,7 @@ class BaseCoverageStudy(ABC):
             progress: If True, show progress indicators.
             transform: Multiplier transform name ('student'|'gauss') or None.
             transform_power: Power mapping effective sample size to df.
+            rho_power: Exponent used for latent AR correlation scaling.
         """
         self.process_template = process_template
         self.sample_size = int(sample_size)
@@ -66,6 +84,7 @@ class BaseCoverageStudy(ABC):
         self.progress = bool(progress)
         self.transform = transform if transform is None else str(transform)
         self.transform_power = float(transform_power)
+        self.rho_power = float(rho_power)
 
         self.series_uniform_ok: List[bool] = []
         self.series_pointwise_frac: List[float] = []
@@ -82,7 +101,14 @@ class BaseCoverageStudy(ABC):
 
     @staticmethod
     def _safe_str(x: Any) -> str:
-        """Filename-safe compact str."""
+        """Convert an object to a filename-safe compact string.
+
+        Args:
+            x (Any): Object to format.
+
+        Returns:
+            str: Filename-safe string representation.
+        """
         if x is None:
             return 'NA'
         if isinstance(x, (list, tuple, np.ndarray)):
@@ -109,6 +135,14 @@ class BaseCoverageStudy(ABC):
         ov = overrides or {}
 
         def add_common_time_parts(d: Dict[str, Any]):
+            """Add shared mean, trend, seasonal, and RNG kwargs.
+
+            Args:
+                d (Dict[str, Any]): Keyword dictionary to mutate.
+
+            Returns:
+                Dict[str, Any]: Mutated keyword dictionary.
+            """
             d['mean'] = ov.get('mean', float(getattr(base, 'mean', 0.0)))
             d['trend_slope'] = ov.get(
                 'trend_slope', float(getattr(base, 'trend_slope', 0.0))
@@ -127,10 +161,26 @@ class BaseCoverageStudy(ABC):
             return d
 
         def maybe_add_noise_std(d: Dict[str, Any]):
+            """Add noise standard deviation if the process supports it.
+
+            Args:
+                d (Dict[str, Any]): Keyword dictionary to mutate.
+
+            Returns:
+                Dict[str, Any]: Mutated keyword dictionary.
+            """
             d['noise_std'] = ov.get('noise_std', float(getattr(base, 'noise_std', 1.0)))
             return d
 
         def maybe_add_shock_kwargs(d: Dict[str, Any]):
+            """Add shock-related kwargs when present on the template.
+
+            Args:
+                d (Dict[str, Any]): Keyword dictionary to mutate.
+
+            Returns:
+                Dict[str, Any]: Mutated keyword dictionary.
+            """
             shock_keys = (
                 'shock_type',
                 'jump_prob',
@@ -169,7 +219,13 @@ class BaseCoverageStudy(ABC):
             maybe_add_noise_std(kwargs)
             maybe_add_shock_kwargs(kwargs)
 
-            kwargs['phi'] = float(ov.get('phi', base.phi))
+            phi_val = ov.get('phi', base.phi)
+            phi_arr = np.asarray(phi_val, dtype=float)
+
+            if phi_arr.ndim == 0 or phi_arr.size == 1:
+                kwargs['phi'] = float(phi_arr.reshape(-1)[0])
+            else:
+                kwargs['phi'] = phi_arr.reshape(-1).copy()
             return kwargs
 
         if all(hasattr(base, a) for a in ('omega', 'alpha', 'beta')):
@@ -238,6 +294,7 @@ class BaseCoverageStudy(ABC):
         seed: int,
         transform: Optional[str],
         transform_power: float,
+        rho_power: float,
     ):
         """Joblib-friendly worker that runs a single eta sweep.
 
@@ -254,6 +311,7 @@ class BaseCoverageStudy(ABC):
             seed: RNG seed for reproducibility.
             transform: Multiplier transform name.
             transform_power: Power mapping effective sample size to df.
+            rho_power: Exponent used for latent AR correlation scaling.
 
         Returns:
             Tuple[float, Dict]: (eta, result_dict) where result_dict is the
@@ -264,10 +322,14 @@ class BaseCoverageStudy(ABC):
         ekw.setdefault('sample_size', int(sample_size))
         ekw.setdefault('burn_in', int(burn_in))
         ekw.setdefault('var_warmup', int(var_warmup))
-        ekw['transform'] = str(transform)
+        ekw.setdefault('transform', None if transform is None else str(transform))
+
         ekw.setdefault('transform_power', float(transform_power))
         ekw['alpha'] = float(alpha)
-        ekw.setdefault('use_variance_smoothing', True)
+        ekw.setdefault('use_variance_smoothing', False)
+        ekw.setdefault('rho_power', float(rho_power))
+
+        effective_transform = ekw.get('transform', transform)
 
         substudy = study_cls(
             process_template=process_template,
@@ -279,8 +341,9 @@ class BaseCoverageStudy(ABC):
             alpha=alpha,
             seed=seed,
             progress=False,
-            transform=transform,
+            transform=effective_transform,  # KEY FIX
             transform_power=transform_power,
+            rho_power=rho_power,
         )
         return eta, substudy.run(position=0, leave_inner=False)
 
@@ -329,7 +392,17 @@ class BaseCoverageStudy(ABC):
         )
 
     @abstractmethod
-    def run(self, position: int = 0, leave_inner: bool = False) -> Dict[str, Any]: ...
+    def run(self, position: int = 0, leave_inner: bool = False) -> Dict[str, Any]:
+        """Run the study and return coverage summaries.
+
+        Args:
+            position (int, optional): Progress-bar display position.
+            leave_inner (bool, optional): If True, leave nested progress bars.
+
+        Returns:
+            Dict[str, Any]: Coverage summary dictionary.
+        """
+        ...
 
     @abstractmethod
     def run_smoothing_sweep(
@@ -339,7 +412,20 @@ class BaseCoverageStudy(ABC):
         parallel: bool = True,
         n_jobs: int = -1,
         verbose: int = 10,
-    ) -> dict: ...
+    ) -> dict:
+        """Run a smoothing-parameter sweep.
+
+        Args:
+            smoothing_grid (Sequence[float]): Smoothing values to evaluate.
+            save_path (Optional[str], optional): Optional path for saved sweep.
+            parallel (bool, optional): If True, run sweep jobs in parallel.
+            n_jobs (int, optional): Number of joblib workers.
+            verbose (int, optional): Joblib verbosity.
+
+        Returns:
+            dict: Sweep result object or mapping.
+        """
+        ...
 
     @classmethod
     @abstractmethod
@@ -362,5 +448,36 @@ class BaseCoverageStudy(ABC):
         verbose: int = 10,
         *,
         transform: str = 'student',
+        transform_power: float = 1.0 / 3.0,
+        rho_power: float = (-1.0 / 3.0),
         var_warmup: int = 0,
-    ) -> Dict[str, Dict[str, Any]]: ...
+    ) -> Dict[str, Dict[str, Any]]:
+        """Run a collection of smoothing sweeps over DGP and experiment settings.
+
+        Args:
+            base_process_template: Process template to clone for each run.
+            sample_size (int, optional): Number of samples per simulated series.
+            dgp_overrides (Optional[List[dict]], optional): Process parameter
+                overrides.
+            exp_kwargs_overrides (Optional[List[dict]], optional): Experiment
+                keyword overrides.
+            smoothing_grid (Sequence[float], optional): Smoothing values.
+            outdir (Union[str, Path], optional): Output directory.
+            n_series (int, optional): Number of simulated series per setting.
+            burn_in (int, optional): Burn-in length.
+            alpha (float, optional): Nominal significance level.
+            base_exp_kwargs (Optional[dict], optional): Base experiment kwargs.
+            seed (Optional[int], optional): Master RNG seed.
+            progress (bool, optional): If True, show progress bars.
+            parallel (bool, optional): If True, run jobs in parallel.
+            n_jobs (int, optional): Number of joblib workers.
+            verbose (int, optional): Joblib verbosity.
+            transform (str, optional): Multiplier transform.
+            transform_power (float, optional): Transform power.
+            rho_power (float, optional): Latent correlation exponent.
+            var_warmup (int, optional): Variance warmup length.
+
+        Returns:
+            Dict[str, Dict[str, Any]]: Sweep outputs keyed by run name.
+        """
+        ...

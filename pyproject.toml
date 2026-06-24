@@ -3,9 +3,9 @@ requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
 
 [project]
-name = "bstrapping"
+name = "olbootstrap"
 version = "0.0.1"
-description = "Online bootstrap for non-stationary time series"
+description = "Online Bootstrap Inference for the Trend of Nonstationary Time Series"
 authors = [
   { name = "Anonymous" },
 ]

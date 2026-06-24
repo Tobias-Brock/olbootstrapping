@@ -45,6 +45,17 @@ class BasePlotter:
         dpi: int = 150,
         rc_overrides: Optional[Dict[str, Any]] = None,
     ):
+        """Initialize the base plotter style state.
+
+        Args:
+            style (str, optional): Matplotlib style name or "science".
+                Defaults to "science".
+            figsize (Tuple[float, float], optional): Default figure size.
+                Defaults to (12, 6).
+            dpi (int, optional): Default figure DPI. Defaults to 150.
+            rc_overrides (Optional[Dict[str, Any]], optional): Runtime rcParam
+                overrides merged after defaults. Defaults to None.
+        """
         self.style = style
         self.figsize = figsize
         self.dpi = int(dpi)
@@ -52,7 +63,11 @@ class BasePlotter:
         self._apply_style()
 
     def _apply_style(self) -> None:
-        """Apply plotting style and merged rcParams."""
+        """Apply plotting style and merged rcParams.
+
+        Returns:
+            None
+        """
         try:
             if isinstance(self.style, str) and self.style.lower() == 'science':
                 plt.style.use(['science', 'no-latex'])
@@ -72,7 +87,15 @@ class BasePlotter:
         plt.rcParams.update(rc)
 
     def update_style(self, *, rc_overrides: Optional[Dict[str, Any]] = None) -> None:
-        """Update runtime rc overrides and re-apply style."""
+        """Update runtime rc overrides and re-apply style.
+
+        Args:
+            rc_overrides (Optional[Dict[str, Any]], optional): Additional rcParam
+                overrides to merge into the current overrides.
+
+        Returns:
+            None
+        """
         if rc_overrides:
             self._rc_overrides.update(rc_overrides)
         self._apply_style()
@@ -134,7 +157,31 @@ class BasePlotter:
         show_uniform_band: bool = True,
         show_mu: bool = True,
     ) -> plt.Axes:
-        """Draw a single bootstrap panel on an existing axis."""
+        """Draw a single bootstrap panel on an existing axis.
+
+        Args:
+            ax (plt.Axes): Axis on which to draw the panel.
+            res (ExperimentResults): Experiment result container.
+            plot_series (bool, optional): If True, show observed samples.
+            alpha (float, optional): Nominal significance level.
+            center_label (str, optional): Label for the bootstrap center.
+            legend_fontsize (int, optional): Legend font size.
+            tick_labelsize (int, optional): Tick label font size.
+            axis_labelsize (int, optional): Axis label font size.
+            title (Optional[str], optional): Optional axis title.
+            title_size (int, optional): Title font size.
+            marker_size (int, optional): Marker size for line handles.
+            line_width (float, optional): Line width for plotted series.
+            show_pointwise_band (bool, optional): If True, draw pointwise bands.
+            show_uniform_band (bool, optional): If True, draw uniform bands.
+            show_mu (bool, optional): If True, draw the true mean when available.
+
+        Returns:
+            plt.Axes: The axis that was drawn on.
+
+        Raises:
+            RuntimeError: If `res.times` is missing.
+        """
         if res.times is None:
             raise RuntimeError('res.times required')
 
@@ -145,14 +192,14 @@ class BasePlotter:
                 times,
                 res.samples[times - 1],
                 linestyle='None',
-                marker='o',  # filled circle
-                markersize=1.9,  # 1.6-2.2 is a good range; tune to taste
-                alpha=0.43,  # 0.30-0.45 => visible but translucent
-                color='0.10',  # dark gray; use "k" for pure black
-                markeredgewidth=0.35,  # tiny edge helps visibility
-                markeredgecolor='white',  # white halo makes points readable over bands
-                zorder=4,  # draw above bands
-                rasterized=True,  # optional: rasterize many points for smaller vector output
+                marker='o',
+                markersize=1.9,
+                alpha=0.43,
+                color='0.10',
+                markeredgewidth=0.35,
+                markeredgecolor='white',
+                zorder=4,
+                rasterized=True,
             )
         if res.bootstrap_means is not None:
             ax.plot(
@@ -163,7 +210,7 @@ class BasePlotter:
                 label=center_label,
                 zorder=5,
                 markersize=marker_size,
-                color='red',  # if not already set elsewhere
+                color='red',
             )
 
         if (
@@ -175,13 +222,11 @@ class BasePlotter:
                 times,
                 res.lower_bounds,
                 res.upper_bounds,
-                alpha=0.18,  # subtle
+                alpha=0.18,
                 label=f'Bootstrap {(100*(1-alpha)):.1f}% pointwise band',
                 zorder=1,
-                # color=None,               # use default color cycle, or set a soft facecolor
             )
-            # optional: light edge (very thin)
-            pc.set_edgecolor('none')  # or a light color
+            pc.set_edgecolor('none')
             pc.set_linewidth(0.0)
 
         if (
@@ -195,10 +240,9 @@ class BasePlotter:
                 urt,
                 res.uniform_lower,
                 res.uniform_upper,
-                alpha=0.40,  # stronger
+                alpha=0.40,
                 label=f'Bootstrap {(100*(1-alpha)):.1f}% uniform band',
-                zorder=2,  # above pointwise band and dots
-                # color=None,               # choose a distinct facecolor if you want
+                zorder=2,
             )
             uc.set_edgecolor('black')  # or a darker version of the facecolor
             uc.set_linewidth(0.8)
@@ -266,7 +310,33 @@ class BasePlotter:
     ):
         """Plot one or many SweepResults on an nrows x ncols grid.
 
-        `sweeps` should be a sequence of SweepResults (or dict-like with the same keys).
+        Args:
+            sweeps (Sequence): SweepResults objects or dict-like equivalents.
+            nrows (int, optional): Number of subplot rows.
+            ncols (int, optional): Number of subplot columns.
+            titles (Optional[Sequence[str]], optional): Optional subplot titles.
+            show_target (bool, optional): If True, draw the nominal coverage line.
+            figsize (Optional[tuple], optional): Figure size override.
+            dpi (Optional[int], optional): Figure DPI override.
+            save_path (Optional[Union[str, Path]], optional): Optional output path.
+            save_kwargs (Optional[dict], optional): Extra `fig.savefig` kwargs.
+            show (bool, optional): If True, call `plt.show()`.
+            legend_fontsize (int, optional): Legend font size.
+            tick_labelsize (int, optional): Tick label font size.
+            axis_labelsize (int, optional): Axis label font size.
+            title_size (int, optional): Title font size.
+            marker_size (int, optional): Marker size.
+            line_width (float, optional): Line width.
+            reduce_whitespace (bool, optional): If True, use compact layout.
+            tight_pad (float, optional): Padding passed to `tight_layout`.
+            hspace (float, optional): Subplot vertical spacing.
+            wspace (float, optional): Subplot horizontal spacing.
+
+        Returns:
+            tuple: `(fig, axes)` where axes has shape `(nrows, ncols)`.
+
+        Raises:
+            ValueError: If no sweeps are provided or the grid is too small.
         """
         K = len(sweeps)
         cells = nrows * ncols
@@ -284,6 +354,16 @@ class BasePlotter:
         flat_axes = axes.ravel()
 
         def _unpack(s):
+            """Extract sorted sweep arrays from an object or mapping.
+
+            Args:
+                s: SweepResults-like object or mapping.
+
+            Returns:
+                tuple[np.ndarray, np.ndarray, np.ndarray, float]: Sorted eta,
+                    average uniform-time coverage, uniform-over-series coverage,
+                    and alpha.
+            """
             if hasattr(s, 'eta'):
                 eta = np.asarray(s.eta, dtype=float)
                 y_u_t = np.asarray(s.avg_uniform_time_fraction, dtype=float)
@@ -346,7 +426,6 @@ class BasePlotter:
             ax.legend(loc='best', fontsize=legend_fontsize, frameon=True)
             ax.grid(True, linestyle='--', alpha=0.5)
 
-        # hide unused axes
         for j in range(K, cells):
             flat_axes[j].set_visible(False)
 

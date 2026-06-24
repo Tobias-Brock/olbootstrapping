@@ -126,7 +126,11 @@ class BaseProcess:
         return trend_seq, seasonal_seq
 
     def _prepare_deterministic_jump_map(self):
-        """Prepare an internal map of deterministic jump times to sizes."""
+        """Prepare an internal map of deterministic jump times to sizes.
+
+        Returns:
+            None
+        """
         self._det_sizes_map = {}
         if not self._det_jump_times:
             return
@@ -159,12 +163,20 @@ class BaseProcess:
         return trend_seq, seasonal_seq
 
     def _decay_transient_before_step(self):
-        """Decay transient shock component before generating the next time step."""
+        """Decay transient shock component before generating the next time step.
+
+        Returns:
+            None
+        """
         if self.shock_type == 'transient':
             self._transient *= float(self.decay)
 
     def _maybe_apply_jump_t1(self):
-        """Apply deterministic or random jump at t=1 BEFORE generating X_1."""
+        """Apply deterministic or random jump before generating the first sample.
+
+        Returns:
+            None
+        """
         if self.shock_type == 'none':
             return
         j = None
@@ -182,7 +194,14 @@ class BaseProcess:
             self._jump_sizes_list.append(j)
 
     def _maybe_apply_jump(self, time1: int):
-        """Apply deterministic or random jump at a given 1-based time (>=2)."""
+        """Apply deterministic or random jump at a given 1-based time.
+
+        Args:
+            time1 (int): 1-based time index at which to evaluate jumps.
+
+        Returns:
+            None
+        """
         if self.shock_type == 'none':
             return
         j = None
@@ -200,6 +219,11 @@ class BaseProcess:
             self._jump_sizes_list.append(j)
 
     def _shock_component(self) -> float:
+        """Return the active shock contribution to the process mean.
+
+        Returns:
+            float: Current permanent or transient shock component.
+        """
         if self.shock_type == 'permanent':
             return self._level_jump
         elif self.shock_type == 'transient':
@@ -208,6 +232,14 @@ class BaseProcess:
             return 0.0
 
     def _log_shock_state(self, i: int):
+        """Store the current shock state at a zero-based sample index.
+
+        Args:
+            i (int): Zero-based sample index to write into metadata arrays.
+
+        Returns:
+            None
+        """
         self._level_jumps[i] = self._level_jump
         self._transient_seq[i] = self._transient
 
